@@ -110,7 +110,8 @@ from the set of records."
                   (format nil "(~A)"
                           (cl-ppcre:regex-replace-all
                             *csv-pattern-regex*
-                            (file-io:slurp-file data-path)
+                            ;; (file-io:slurp-file data-path)
+
                             #'create-sexpr
                             :simple-calls t)))
                 data-time-series)
