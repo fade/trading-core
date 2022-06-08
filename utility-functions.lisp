@@ -2,13 +2,22 @@
 
 (in-package #:trading-core)
 
+;;; the trading-core system depends on a system called 'file-io' in
+;;; four places in the code. This system is not known in quicklisp,
+;;; and it is not included in this repository, so we need to replace
+;;; it with something more standard.
+
+(defun spit-file (content location)
+  (with-open-file (s location :direction output :if-exists :supersede)
+    (format s "~A" content)))
+
 ;;; utility-functions methods
 
 (defun extract-initials (keyword)
   (loop for prev-char = nil then char
         for char across (symbol-name keyword)
         when (or (null prev-char) (char= prev-char #\-))
-        collecting char into initials
+          collecting char into initials
         finally (return (coerce initials 'string))))
 
 (defun avg-list (list &optional (key-fn #'identity))

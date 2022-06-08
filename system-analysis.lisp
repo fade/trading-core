@@ -49,9 +49,9 @@ containing the objects specified by the predicates."
           minimize stat into min-stats
           maximize stat into max-stats
           finally (multiple-value-bind (numeric-predicates bins)
-                    (interval-division-predicates-bins
-                      min-stats max-stats num-bins
-                      :hard-lower-bound t :hard-upper-bound t)
+                      (interval-division-predicates-bins
+                       min-stats max-stats num-bins
+                       :hard-lower-bound t :hard-upper-bound t)
                     (let* ((agent-predicates (mapcar (lambda (p)
                                                        (lambda (a)
                                                          (funcall p (getstat a))))
@@ -75,7 +75,7 @@ containing the objects specified by the predicates."
                       appending `(when ,var collect (list (cons :is-first ,is-first)
                                                           (cons :utc-date ,utc-date)
                                                           (cons :value (format nil "~,8f" ,var)))
-                                   into ,array-var)))
+                                       into ,array-var)))
               (return-values (loop for (name nil array-var) in indicator-vars
                                    collecting `(list (cons :indicator-name ,name)
                                                      (cons :indicator-data (coerce ,array-var 'vector))))))
@@ -111,19 +111,19 @@ containing the objects specified by the predicates."
   (let* ((unix-timestamp (local-time:timestamp-to-unix (trade-timestamp trade))))
     `((:utc-date . ,(* 1000 unix-timestamp))
       (:display-date . ,(local-time:format-timestring
-                          nil (trade-timestamp trade)
-                          :format '(:year "-" (:month 2) "-" (:day 2))))
+                         nil (trade-timestamp trade)
+                         :format '(:year "-" (:month 2) "-" (:day 2))))
       (:quantity . ,(trade-quantity trade))
       (:price . ,(format nil "~,4F" (trade-price trade))))))
 
 (defmethod extract-context-data ((stats trade-stats))
   "Returns the relevant context data for a TRADE-STATS data."
   `#(((:stat-name . "End Date") (:stat-value . ,(or
-                                                  (and (trade-stats-timestamp stats)
-                                                     (local-time:format-timestring
-                                                       nil (trade-stats-timestamp stats)
-                                                       :format '(:year "-" (:month 2) "-" (:day 2))))
-                                                  "N/A")))
+                                                 (and (trade-stats-timestamp stats)
+                                                  (local-time:format-timestring
+                                                   nil (trade-stats-timestamp stats)
+                                                   :format '(:year "-" (:month 2) "-" (:day 2))))
+                                                 "N/A")))
      ((:stat-name . "Total P/L")
       (:stat-value . ,(format nil "~,4F" (trade-stats-total-pl stats))))
      ((:stat-name . "% Profitable")
@@ -146,20 +146,20 @@ containing the objects specified by the predicates."
   (let ((trades (reverse (trades agent))))
     `((:agent-name . ,(name agent))
       (:agent-prices . ,(let ((first t))
-                         (map 'vector
-                              (lambda (ts price)
-                                `((:is-first . ,(prog1
-                                                  first
-                                                  (and first (setf first nil))))
-                                  (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts)))
-                                  (:price . ,(format nil "~,4F" price))))
-                              (reverse (timestamps agent))
-                              (reverse (revalprices agent)))))
+                          (map 'vector
+                               (lambda (ts price)
+                                 `((:is-first . ,(prog1
+                                                     first
+                                                   (and first (setf first nil))))
+                                   (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts)))
+                                   (:price . ,(format nil "~,4F" price))))
+                               (reverse (timestamps agent))
+                               (reverse (revalprices agent)))))
       (:long-trades . ,(let ((first t))
                          (map 'vector
                               (lambda (trade)
                                 `((:is-first . ,(prog1
-                                                  first
+                                                    first
                                                   (and first (setf first nil))))
                                   ,@(extract-context-data trade)))
                               (remove-if #'minusp trades :key #'trade-quantity))))
@@ -167,7 +167,7 @@ containing the objects specified by the predicates."
                           (map 'vector
                                (lambda (trade)
                                  `((:is-first . ,(prog1
-                                                   first
+                                                     first
                                                    (and first (setf first nil))))
                                    ,@(extract-context-data trade)))
                                (remove-if #'plusp trades :key #'trade-quantity))))
@@ -176,61 +176,61 @@ containing the objects specified by the predicates."
                         (map 'vector
                              (lambda (trade)
                                `((:is-first . ,(prog1
-                                                 first
+                                                   first
                                                  (and first (setf first nil))))
                                  (:even-row . ,(evenp (incf row-number)))
                                  ,@(extract-context-data trade)))
                              trades)))
       (:agent-in-trade-equity . 
-       ,(let ((first t)
-              (rolling-pl 0)
-              (timestamps (reverse (timestamps agent)))
-              (prices (reverse (revalprices agent))))
-          (coerce
-            (delete-duplicates
-              (mapcan
-                (lambda (trade-group)
-                  (let ((ts-start (trade-group-entry-timestamp trade-group))
-                        (ts-end (trade-group-exit-timestamp trade-group))
-                        (trade-pl (trade-group-pl trade-group))
-                        (position (trade-quantity (first (trade-group-trades trade-group))))
-                        starting-equity
-                        prev-price)
-                    (loop while (local-time:timestamp< (first timestamps) ts-start)
-                          do (pop timestamps)
-                          do (pop prices))
-                    (setf starting-equity rolling-pl
-                          prev-price (first prices))
-                    `(((:is-first . ,(prog1
-                                       first
-                                       (and first (setf first nil))))
-                       (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-start)))
-                       (:equity . ,(format nil "~,4F" rolling-pl)))
-                      ,@(loop while (local-time:timestamp< (first timestamps) ts-end)
-                          for trade = (first (trade-group-trades trade-group)) then
-                                      (find (first timestamps) (trade-group-trades trade-group)
-                                            :key #'trade-timestamp :test #'local-time:timestamp=)
-                          for position = (trade-quantity trade) then
-                                          (if trade (+ position (trade-quantity trade)) position)
-                          do (incf rolling-pl (* position (- (first prices) prev-price)))
-                          collect `((:is-first . nil)
-                                    (:utc-date . ,(* 1000 (local-time:timestamp-to-unix (first timestamps))))
-                                    (:equity . ,(format nil "~,4F" rolling-pl)))
-                          do (progn
-                               (setf prev-price (first prices))
-                               (pop timestamps)
-                               (pop prices)))
-                      ((:is-first . nil)
-                       (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-end)))
-                       (:equity . ,(format nil "~,4F" (incf rolling-pl (- (+ starting-equity trade-pl) rolling-pl))))))))
-                (reverse (trade-groups agent)))
-              :test #'equalp)
-            'vector)))
+                              ,(let ((first t)
+                                     (rolling-pl 0)
+                                     (timestamps (reverse (timestamps agent)))
+                                     (prices (reverse (revalprices agent))))
+                                 (coerce
+                                  (delete-duplicates
+                                   (mapcan
+                                    (lambda (trade-group)
+                                      (let ((ts-start (trade-group-entry-timestamp trade-group))
+                                            (ts-end (trade-group-exit-timestamp trade-group))
+                                            (trade-pl (trade-group-pl trade-group))
+                                            (position (trade-quantity (first (trade-group-trades trade-group))))
+                                            starting-equity
+                                            prev-price)
+                                        (loop while (local-time:timestamp< (first timestamps) ts-start)
+                                              do (pop timestamps)
+                                              do (pop prices))
+                                        (setf starting-equity rolling-pl
+                                              prev-price (first prices))
+                                        `(((:is-first . ,(prog1
+                                                             first
+                                                           (and first (setf first nil))))
+                                           (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-start)))
+                                           (:equity . ,(format nil "~,4F" rolling-pl)))
+                                          ,@(loop while (local-time:timestamp< (first timestamps) ts-end)
+                                                  for trade = (first (trade-group-trades trade-group)) then
+                                                                                                       (find (first timestamps) (trade-group-trades trade-group)
+                                                                                                             :key #'trade-timestamp :test #'local-time:timestamp=)
+                                                  for position = (trade-quantity trade) then
+                                                                                        (if trade (+ position (trade-quantity trade)) position)
+                                                  do (incf rolling-pl (* position (- (first prices) prev-price)))
+                                                  collect `((:is-first . nil)
+                                                            (:utc-date . ,(* 1000 (local-time:timestamp-to-unix (first timestamps))))
+                                                            (:equity . ,(format nil "~,4F" rolling-pl)))
+                                                  do (progn
+                                                       (setf prev-price (first prices))
+                                                       (pop timestamps)
+                                                       (pop prices)))
+                                          ((:is-first . nil)
+                                           (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-end)))
+                                           (:equity . ,(format nil "~,4F" (incf rolling-pl (- (+ starting-equity trade-pl) rolling-pl))))))))
+                                    (reverse (trade-groups agent)))
+                                   :test #'equalp)
+                                  'vector)))
       (:agent-positions . ,(let ((first t))
                              (map 'vector
                                   (lambda (ts pos)
                                     `((:is-first . ,(prog1
-                                                      first
+                                                        first
                                                       (and first (setf first nil))))
                                       (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts)))
                                       (:position . ,(adjusted-position pos))))
@@ -239,23 +239,23 @@ containing the objects specified by the predicates."
       (:agent-trade-profit-losses . ,(let ((first t)
                                            (rolling-pl 0))
                                        (coerce
-                                         (delete-duplicates
-                                          (mapcan
-                                           (lambda (trade-group)
-                                             (let ((ts-start (trade-group-entry-timestamp trade-group))
-                                                   (ts-end (trade-group-exit-timestamp trade-group))
-                                                   (trade-pl (trade-group-pl trade-group)))
-                                               `(((:is-first . ,(prog1
-                                                                  first
-                                                                  (and first (setf first nil))))
-                                                  (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-start)))
-                                                  (:equity . ,(format nil "~,4F" rolling-pl)))
-                                                 ((:is-first . nil)
-                                                  (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-end)))
-                                                  (:equity . ,(format nil "~,4F" (incf rolling-pl trade-pl)))))))
-                                           (reverse (trade-groups agent)))
-                                          :test #'equalp)
-                                         'vector)))
+                                        (delete-duplicates
+                                         (mapcan
+                                          (lambda (trade-group)
+                                            (let ((ts-start (trade-group-entry-timestamp trade-group))
+                                                  (ts-end (trade-group-exit-timestamp trade-group))
+                                                  (trade-pl (trade-group-pl trade-group)))
+                                              `(((:is-first . ,(prog1
+                                                                   first
+                                                                 (and first (setf first nil))))
+                                                 (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-start)))
+                                                 (:equity . ,(format nil "~,4F" rolling-pl)))
+                                                ((:is-first . nil)
+                                                 (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts-end)))
+                                                 (:equity . ,(format nil "~,4F" (incf rolling-pl trade-pl)))))))
+                                          (reverse (trade-groups agent)))
+                                         :test #'equalp)
+                                        'vector)))
       (:buy-hold-equity . ,(let* ((first t)
                                   (first-trade (car (last (trades agent))))
                                   (first-trade-date (when (not (null first-trade))
@@ -273,7 +273,7 @@ containing the objects specified by the predicates."
                                     (incf rolling-pl (- p prev-price))
                                     (setf prev-price p)
                                     `((:is-first . ,(prog1
-                                                      first
+                                                        first
                                                       (and first (setf first nil))))
                                       (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts)))
                                       (:equity . ,(format nil "~,4F" rolling-pl))))
@@ -291,31 +291,31 @@ containing the objects specified by the predicates."
       (let ((analysis-context
               `((:title . ,(format nil "~:A - ~A Analysis"
                                    (string-capitalize
-                                     (substitute-if #\Space
-                                                    (lambda (c)
-                                                      (or (char= c #\-)
-                                                          (char= c #\_)))
-                                                    (name agent)))
+                                    (substitute-if #\Space
+                                                   (lambda (c)
+                                                     (or (char= c #\-)
+                                                         (char= c #\_)))
+                                                   (name agent)))
                                    (symbol-name (security agent))))
                 (:stock-symbol . ,(security agent))
                 
                 (:stock-data .
-                 ,(let ((first t))
-                    (map 'vector
-                         (lambda (p)
-                           `((:is-first . ,(prog1
-                                             first
-                                             (and first (setf first nil))))
-                             ,@(extract-context-data p)))
-                         (cdr (assoc (security agent) security-data)))))
+                             ,(let ((first t))
+                                (map 'vector
+                                     (lambda (p)
+                                       `((:is-first . ,(prog1
+                                                           first
+                                                         (and first (setf first nil))))
+                                         ,@(extract-context-data p)))
+                                     (cdr (assoc (security agent) security-data)))))
                 ,@(extract-context-data agent))))
         (let* ((analysis-file (format nil "~A-analysis.html"
                                       (name agent)))
                (analysis-file-path (merge-pathnames analysis-file *analysis-results-path*)))
-          (file-io:spit-file
-            (mustache:render*
-              (format nil "{{{> ~A}}}" template-name) analysis-context)
-            analysis-file-path)
+          (spit-file
+           (mustache:render*
+            (format nil "{{{> ~A}}}" template-name) analysis-context)
+           analysis-file-path)
           (push analysis-file agent-analysis-files))))
     (format t "~&Analysis files can be found at this location: ~A~{~&  ~A~%~}"
             *analysis-results-path* (nreverse agent-analysis-files)))
@@ -323,6 +323,7 @@ containing the objects specified by the predicates."
 
 (defun compare-results (agents comparison-title security-data &key (template-name "comparison"))
   "Create a web page that compares the trading statistics for a set of trading agents."
+  (declare (ignorable security-data))
   (assert (and (not (null agents)) (listp agents)))
   ;; Add the location of the mustache templates to the search path
   (pushnew *ui-template-path* mustache:*load-path* :test #'string-equal :key #'namestring)
@@ -330,17 +331,17 @@ containing the objects specified by the predicates."
   (let ((analysis-context
           `((:title . ,(format nil "~:A Trading Result Comparison"
                                (string-capitalize
-                                 (substitute-if #\Space
-                                                (lambda (c)
-                                                  (or (char= c #\-)
-                                                      (char= c #\_)))
-                                                comparison-title))))
+                                (substitute-if #\Space
+                                               (lambda (c)
+                                                 (or (char= c #\-)
+                                                     (char= c #\_)))
+                                               comparison-title))))
             (:chart-title-prefix . ,(string-capitalize
-                                      (substitute-if #\Space
-                                                     (lambda (c)
-                                                       (or (char= c #\-)
-                                                           (char= c #\_)))
-                                                     comparison-title)))
+                                     (substitute-if #\Space
+                                                    (lambda (c)
+                                                      (or (char= c #\-)
+                                                          (char= c #\_)))
+                                                    comparison-title)))
             (:buy-hold-data . ,(let* ((first t)
                                       (first-trade (car (last (trades agent))))
                                       (first-trade-date (when (not (null first-trade))
@@ -358,29 +359,29 @@ containing the objects specified by the predicates."
                                         (incf rolling-pl (- p prev-price))
                                         (setf prev-price p)
                                         `((:is-first . ,(prog1
-                                                          first
+                                                            first
                                                           (and first (setf first nil))))
                                           (:utc-date . ,(* 1000 (local-time:timestamp-to-unix ts)))
                                           (:equity . ,(format nil "~,4F" rolling-pl))))
                                       (reverse (timestamps (first agents)))
                                       (reverse (revalprices (first agents))))))
             (:agents . ,(let ((first t)
-                               (row-number 0))
-                           (map 'vector
-                                (lambda (agent)
-                                  `((:is-first . ,(prog1
-                                                    first
-                                                    (and first (setf first nil))))
-                                    (:even-row . ,(evenp (incf row-number)))
-                                    ,@(extract-context-data agent)))
-                                agents))))))
+                              (row-number 0))
+                          (map 'vector
+                               (lambda (agent)
+                                 `((:is-first . ,(prog1
+                                                     first
+                                                   (and first (setf first nil))))
+                                   (:even-row . ,(evenp (incf row-number)))
+                                   ,@(extract-context-data agent)))
+                               agents))))))
     (let ((comparison-file (format nil "~A-comparison.html"
                                    (substitute-if #\_ (lambda (c) (char= c #\Space))
                                                   comparison-title))))
-      (file-io:spit-file
-        (mustache:render*
-          (format nil "{{{> ~A}}}" template-name) analysis-context)
-        (merge-pathnames :name comparison-file *analysis-results-path*))
+      (spit-file
+       (mustache:render*
+        (format nil "{{{> ~A}}}" template-name) analysis-context)
+       (merge-pathnames :name comparison-file *analysis-results-path*))
       (format t "~&The result comparison file can be found at this location: ~A~A"
               *analysis-results-path* comparison-file))))
 
