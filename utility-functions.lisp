@@ -8,6 +8,7 @@
 ;;; it with something more standard.
 
 (defun spit-file (content location)
+  "given CONTENT, put it into the file at LOCATION."
   (with-open-file (s location :direction output :if-exists :supersede)
     (format s "~A" content)))
 

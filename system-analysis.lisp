@@ -381,7 +381,9 @@ containing the objects specified by the predicates."
       (spit-file
        (mustache:render*
         (format nil "{{{> ~A}}}" template-name) analysis-context)
-       (merge-pathnames :name comparison-file *analysis-results-path*))
+       ;; FIXME: this is not right.
+       (merge-pathnames comparison-file *analysis-results-path*))
+      
       (format t "~&The result comparison file can be found at this location: ~A~A"
               *analysis-results-path* comparison-file))))
 
