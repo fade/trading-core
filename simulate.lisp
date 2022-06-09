@@ -111,7 +111,7 @@ from the set of records."
                           (cl-ppcre:regex-replace-all
                             *csv-pattern-regex*
                             ;; (file-io:slurp-file data-path)
-
+                            (rutils:slurp data-path)
                             #'create-sexpr
                             :simple-calls t)))
                 data-time-series)
